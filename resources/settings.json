@@ -1,0 +1,8 @@
+{
+    "Status": "dnd",
+    "Presences": [
+        { "type": 3, "name": "Someone who created me!" },
+        { "type": 2, "name": "Hello World!" }
+    ],
+    "Interval": 30
+}

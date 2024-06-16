@@ -1,73 +1,49 @@
-const fs = require("fs");
-const dotenv = require("dotenv");
-dotenv.config()
-
-const { Client, Partials, Collection, GatewayIntentBits } = require("discord.js");
+import fs from "fs";
+import { Client, Collection, GatewayIntentBits } from "discord.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const client = new Client({
-    partials: [
-        Partials.User,
-        Partials.Channel,
-        Partials.GuildMember,
-        Partials.Message,
-        Partials.Reaction,
-        Partials.GuildScheduledEvent,
-        Partials.ThreadMember
-    ],
-
     intents: [
-		GatewayIntentBits.DirectMessageReactions,
-        GatewayIntentBits.DirectMessageTyping,
         GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.GuildEmojisAndStickers,
-        GatewayIntentBits.GuildIntegrations,
-        GatewayIntentBits.GuildInvites,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMessageTyping,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.GuildScheduledEvents,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildWebhooks,
         GatewayIntentBits.Guilds,
         GatewayIntentBits.MessageContent
-	]
+    ]
 });
 
-const eventFiles = fs.readdirSync("./events")
-    .filter((file) => file.endsWith(".js"));
+client.commands = new Collection()
 
-eventFiles.forEach(file => {
-    const event = require(`./events/${file}`);
-
-    console.log(`Loading events: ${event.name}...`);
-	if (event.isOnce) {
-		client.once(event.name, 
-            (...args) => event.execute(...args, client));
-	} else {
-		client.on(event.name, 
-            async (...args) => await event.execute(...args, client));
-	}
-})
-
-client.commands = new Collection();
-
-const commandFolders = fs.readdirSync("./commands")
+const commandFolders = fs.readdirSync("./commands");
 
 commandFolders.forEach(folder => {
-    const commandFiles = fs.readdirSync(`./commands/${folder}`)
-        .filter((file) => file.endsWith(".js"));
+	const commandFiles = fs.readdirSync(`./commands/${folder}`).filter(file => file.endsWith('.js'));
 
-    commandFiles.forEach(file => {
-        const command = require(`./commands/${folder}/${file}`);
+    commandFiles.forEach(async file => {
+		const command = await import(`./commands/${folder}/${file}`);
+		
+		// Set a new item in the Collection with the key as the command name and the value as the exported module
+		if ('data' in command.default && 'execute' in command.default) {
+			client.commands.set(command.default.data.name, command.default);
+		} else {
+			console.log(`[WARNING] The command at ${command.default.data.name} is missing a required "data" or "execute" property.`);
+		}
+    })
+})
 
-        client.commands.set(command.name, command);
-        console.log(`Loading commands: ${command.name}...`);
-    });
+const eventFiles = fs.readdirSync("./events").filter((file) => file.endsWith(".js"));
+
+eventFiles.forEach(async file => {
+    const event = await import(`./events/${file}`);
+
+	console.log(event.default)
+
+	if (event.default.isOnce) {
+		client.once(event.default.name, 
+            (...args) => event.default.execute(...args, client));
+	} else {
+		client.on(event.default.name, 
+            async (...args) => await event.default.execute(...args, client));
+	}
 });
 
-client.login(process.env.API_TOKEN).catch(error => {
-    console.error("Err: API_TOKEN Tidak boleh kosong atau terdapat kesalahan pada TOKEN?");
-    console.error("Error code: " + error.code);
-});
+client.login(process.env.TOKEN_API);
